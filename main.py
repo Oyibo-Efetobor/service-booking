@@ -100,7 +100,7 @@ try:
     time.sleep(3)
 
     # Step 3: Go to service schedule page with auto-reload until successful
-    max_retries = 60  # Try for up to 5 minutes (60 x 5s)
+    max_retries = 360  # Try for up to 30 minutes (360 x 5s)
     for attempt in range(max_retries):
         driver.get('https://att2.lmu.edu.ng/check/serveChoice')
         time.sleep(5)
