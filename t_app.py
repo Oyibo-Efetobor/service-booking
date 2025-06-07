@@ -7,8 +7,8 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, UnexpectedAlertPresentException
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes, CallbackQueryHandler
 
 # Telegram conversation states
 VIP, USERNAME, PASSWORD = range(3)
@@ -17,7 +17,19 @@ VIP, USERNAME, PASSWORD = range(3)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text('Welcome to Chapel Booking Bot!\n\nEnter the VIP service booking password:')
+    keyboard = [[InlineKeyboardButton("Book Service", callback_data='book_service')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        'Welcome to Chapel Booking Bot!\n\nClick the button below to begin booking your service.',
+        reply_markup=reply_markup
+    )
+    return ConversationHandler.END
+
+async def book_service_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.message.delete()
+    await query.message.reply_text('Enter the VIP service booking password:')
     return VIP
 
 async def get_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -194,15 +206,16 @@ def main():
     TOKEN = "8029449841:AAFXIqNoNgjM9Wn1T31NmHXLrjvebUFOh8A"
     app = ApplicationBuilder().token(TOKEN).build()
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
+        entry_points=[CallbackQueryHandler(book_service_entry, pattern='^book_service$')],
         states={
             VIP: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_vip)],
             USERNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_username)],
             PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_password)],
         },
-        fallbacks=[]
+        fallbacks=[CommandHandler('start', start)]
     )
     app.add_handler(conv_handler)
+    app.add_handler(CommandHandler('start', start))
     print('Bot is running. Press Ctrl+C to stop.')
     app.run_polling()
 
