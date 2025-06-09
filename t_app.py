@@ -46,8 +46,8 @@ async def get_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if os.path.exists(excel_path):
         wb = openpyxl.load_workbook(excel_path)
         ws = wb.active
-        usernames = [row[1].value for row in ws.iter_rows(min_row=2) if row[1].value]
-        if username not in usernames:
+        chat_ids = [row[0].value for row in ws.iter_rows(min_row=2) if row[0].value]
+        if chat_id not in chat_ids:
             ws.append([chat_id, username])
             wb.save(excel_path)
     else:
@@ -85,7 +85,7 @@ async def book_service(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return False
         await update.message.reply_text('Login successful! Navigating to service schedule page...')
         # Step 3: Go to service schedule page with auto-reload until successful
-        max_retries = 60
+        max_retries = 600
         for attempt in range(max_retries):
             driver.get('https://att2.lmu.edu.ng/check/serveChoice')
             time.sleep(5)
@@ -118,6 +118,10 @@ async def book_service(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         break
             if not picked:
                 await update.message.reply_text('No available service to pick.')
+                # Print the string in the options for user clarity
+                option_texts = [option.text.strip() for option in options if option.text.strip()]
+                if option_texts:
+                    await update.message.reply_text('Service options on portal:\n' + '\n'.join(option_texts))
             else:
                 # Step 2: Click "I agree" checkbox (by label text if needed)
                 try:
