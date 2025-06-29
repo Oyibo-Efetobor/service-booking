@@ -1,50 +1,92 @@
-import openpyxl
 import os
+import openpyxl
 import asyncio
-from telegram import Bot
+from telegram import Update, Bot
+from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from dotenv import load_dotenv
 
-async def send_broadcast(token: str, mode: int, message: str = '', excel_path: str = 'bot_users.xlsx'):
-    if not os.path.exists(excel_path):
+# Load tokens from .env or hardcode if needed
+load_dotenv()
+MAIN_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+BROADCAST_BOT_TOKEN = '7711565743:AAHjbLb5R-sgJUY2klQZxoWxEwlfkeDrYoM'
+
+if not MAIN_BOT_TOKEN:
+    MAIN_BOT_TOKEN = '8029449841:AAFXIqNoNgjM9Wn1T31NmHXLrjvebUFOh8A'  # fallback to your main bot token
+
+# Path to user Excel file
+EXCEL_PATH = os.path.join(os.path.dirname(__file__), 'bot_users.xlsx')
+
+async def broadcast_to_all_users(update: Update):
+    if not os.path.exists(EXCEL_PATH):
         print('No bot_users.xlsx file found.')
         return
-    wb = openpyxl.load_workbook(excel_path)
+    
+    print("Starting broadcast...")
+    wb = openpyxl.load_workbook(EXCEL_PATH)
     ws = wb.active
-    bot = Bot(token=token)
+    bot = Bot(token=MAIN_BOT_TOKEN)  # Use main bot token for sending messages
+    
+    total_users = sum(1 for row in ws.iter_rows(min_row=2))
+    success_count = 0
+    fail_count = 0
+    
+    text = update.message.text
+    
     for row in ws.iter_rows(min_row=2, values_only=True):
         chat_id = row[0]
         try:
-            if mode == 1:
-                with open('online.png', 'rb') as img:
-                    await bot.send_photo(chat_id=chat_id, photo=img, caption='BROADCAST: Chapel Booking Bot is ONLINE ✅')
-                print(f"Online image sent to {chat_id}")
-            elif mode == 2:
-                with open('offline.png', 'rb') as img:
-                    await bot.send_photo(chat_id=chat_id, photo=img, caption='BROADCAST: Chapel Booking Bot is OFFLINE ❌')
-                print(f"Offline image sent to {chat_id}")
-            elif mode == 3:
-                await bot.send_message(chat_id=chat_id, text=f"BROADCAST MESSAGE FROM EFETOBOR.DEV🚨: \n\n{message}")
-                print(f"Text message sent to {chat_id}")
+            await bot.send_message(chat_id=chat_id, text=text)
+            success_count += 1
+            print(f"Successfully sent message to user {chat_id}")
         except Exception as e:
-            print(f"Failed to send to {chat_id}: {e}")
+            fail_count += 1
+            print(f"Failed to send message to {chat_id}: {str(e)}")
+        
+        # Add a small delay between messages to avoid rate limiting
+        await asyncio.sleep(0.1)
+    
+    print(f"\nBroadcast completed:")
+    print(f"Total users: {total_users}")
+    print(f"Successful: {success_count}")
+    print(f"Failed: {fail_count}")
+    return success_count, fail_count
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Only allow the admin (the creator of the broadcast bot) to send broadcasts
+    admin_id = update.effective_user.id
+    # Optionally, restrict to your Telegram user ID for security
+    # if admin_id != YOUR_TELEGRAM_USER_ID:
+    #     await update.message.reply_text('You are not authorized to broadcast.')
+    #     return
+    
+    await broadcast_to_all_users(update)
+    await update.message.reply_text('Broadcasting message to all users...')
+
+async def main():
+    # This is the broadcast bot's token
+    BROADCAST_BOT_TOKEN = '7711565743:AAHjbLb5R-sgJUY2klQZxoWxEwlfkeDrYoM'
+    app = ApplicationBuilder().token(BROADCAST_BOT_TOKEN).build()
+      # Handle text messages only
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    print('Broadcast bot is running. Send a message, photo, video, or document to broadcast to all users.')
+    await app.run_polling()
 
 if __name__ == '__main__':
-    load_dotenv()
-    token = os.getenv('TELEGRAM_BOT_TOKEN')
-    if not token:
-        print('TELEGRAM_BOT_TOKEN not found in .env file.')
-        exit(1)
-    print('What do you want to broadcast?')
-    print('1. Online image')
-    print('2. Offline image')
-    print('3. Text message')
-    mode = input('Enter 1, 2, or 3: ').strip()
-    if mode == '1':
-        asyncio.run(send_broadcast(token, 1))
-    elif mode == '2':
-        asyncio.run(send_broadcast(token, 2))
-    elif mode == '3':
-        msg = input('Enter the broadcast message: ').strip()
-        asyncio.run(send_broadcast(token, 3, msg))
-    else:
-        print('Invalid input. Exiting.')
+    import sys
+    import asyncio
+    import nest_asyncio
+
+    if sys.platform.startswith('win') and sys.version_info >= (3, 8):
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    
+    # Apply nest_asyncio to allow nested event loops
+    nest_asyncio.apply()
+    
+    # Create and run event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(main())
+    finally:
+        loop.close()

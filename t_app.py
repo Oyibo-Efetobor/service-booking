@@ -9,6 +9,11 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, UnexpectedAlertPresentException
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import subprocess
+import sys
+import os
 
 # Telegram conversation states
 USERNAME, PASSWORD = range(2)
@@ -73,7 +78,7 @@ async def book_service(update: Update, context: ContextTypes.DEFAULT_TYPE):
     booking_made = False  # Track if booking was made in this session
     try:
         driver.get('https://att2.lmu.edu.ng/log/login')
-        time.sleep(2)
+        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.NAME, 'username')))
         driver.find_element(By.NAME, 'username').send_keys(username)
         driver.find_element(By.NAME, 'password').send_keys(password)
         driver.find_element(By.NAME, 'submit').click()
@@ -189,6 +194,15 @@ async def book_service(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except NoSuchElementException as e:
             if 'pudate' in str(e):
                 await update.message.reply_text('Service has already been booked previously for this account.')
+                # Navigate to schedule page and send screenshot
+                driver.get('https://att2.lmu.edu.ng/check/serveChoice')
+                time.sleep(3)
+                try:
+                    import base64
+                    screenshot = driver.execute_cdp_cmd("Page.captureScreenshot", {"fromSurface": True, "captureBeyondViewport": True, "format": "png"})
+                    await update.message.reply_photo(base64.b64decode(screenshot['data']), caption='Here is your existing booking screenshot.')
+                except Exception as cdp_e:
+                    await update.message.reply_text(f'Could not capture existing booking screenshot: {cdp_e}.')
                 driver.quit()
                 return True
             else:
