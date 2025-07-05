@@ -232,7 +232,7 @@ async def book_service(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return True
 
 def main():
-    TOKEN = os.getenv(TELEGRAM_BOT_TOKEN)
+    TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
     app = ApplicationBuilder().token(TOKEN).build()
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
